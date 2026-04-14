@@ -39,7 +39,7 @@ bool initCamera() {
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
   
-    config.xclk_freq_hz = 20000000; 
+    config.xclk_freq_hz = 10000000; 
     config.frame_size = FRAMESIZE_240X240;
     config.pixel_format = PIXFORMAT_RGB565;
     config.grab_mode = CAMERA_GRAB_LATEST;
@@ -54,9 +54,9 @@ bool initCamera() {
         return false;
     }
     
-    // Tùy chỉnh cảm biến (lật ảnh, độ sáng...)
+    // Tùy chỉnh
     sensor_t * s = esp_camera_sensor_get();
-    s->set_vflip(s, 1);   // Lật dọc nếu lắp ngược
+    s->set_vflip(s, 0);   // Lật dọc 
     s->set_hmirror(s, 1); // Lật ngang
 
     return true;

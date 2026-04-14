@@ -1,0 +1,86 @@
+#include <Arduino.h>
+#include "esp_camera.h"
+#include "camera_utils.h"
+
+// Gọi thư viện tìm khuôn mặt của Espressif
+#include "human_face_detect_msr01.hpp" 
+extern HumanFaceDetectMSR01 s1_detector;
+
+// Mảng tĩnh chứa ảnh đã cắt (112 x 112 x 3 kênh màu = 37,632 bytes)
+uint8_t face_112_buf[37632];
+
+// Hàm phụ trợ: Ép màu RGB565 (Camera) sang RGB888 (Cho Python/AI)
+void convert_rgb565_to_rgb888(uint16_t pixel, uint8_t* r, uint8_t* g, uint8_t* b) {
+    // Lưu ý: Camera OV2640 đôi khi bị đảo byte (endianness). 
+    // Nếu Python hiện màu bị nhòe xanh/hồng, hãy mở khóa dòng dưới đây:
+    pixel = (pixel >> 8) | (pixel << 8); 
+
+    *r = (pixel >> 11) & 0x1F;
+    *g = (pixel >> 5) & 0x3F;
+    *b = pixel & 0x1F;
+
+    // Bù bit để màu da người mịn màng hơn (tránh bị rỗ ảnh)
+    *r = (*r << 3) | (*r >> 2);
+    *g = (*g << 2) | (*g >> 4);
+    *b = (*b << 3) | (*b >> 2);
+}
+
+void setup() {
+    Serial.begin(2000000); // Ép xung tốc độ truyền ảnh
+    
+    if (!initCamera()) {
+        Serial.println("Loi Camera!");
+        while (true);
+    }
+}
+
+void loop() {
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (!fb) return;
+
+    // 1. CHẠY AI TÌM KHUÔN MẶT TRÊN ẢNH GỐC
+    std::list<dl::detect::result_t> &results = s1_detector.infer((uint16_t *)fb->buf, {(int)fb->height, (int)fb->width, 3});
+
+    if (results.size() > 0) {
+        // Lấy tọa độ của khuôn mặt đầu tiên tìm thấy
+        dl::detect::result_t best_face = results.front();
+        int box_x = best_face.box[0];
+        int box_y = best_face.box[1];
+        int box_w = best_face.box[2] - best_face.box[0]; // Rộng
+        int box_h = best_face.box[3] - best_face.box[1]; // Cao
+
+        // Chống lỗi tràn viền (khi mặt ở quá sát mép camera)
+        box_x = max(0, box_x);
+        box_y = max(0, box_y);
+        box_w = min((int)fb->width - box_x, box_w);
+        box_h = min((int)fb->height - box_y, box_h);
+
+        int index = 0;
+        uint16_t* img_ptr = (uint16_t*)fb->buf;
+
+        // 2 & 3. THUẬT TOÁN CẮT VÀ RESIZE (Nearest Neighbor) VỀ 112x112
+        for (int y = 0; y < 112; y++) {
+            for (int x = 0; x < 112; x++) {
+                // Nội suy tọa độ: Map điểm 112x112 về tọa độ pixel thực tế của Box
+                int src_x = box_x + (x * box_w) / 112;
+                int src_y = box_y + (y * box_h) / 112;
+
+                // Lấy màu tại tọa độ đó
+                uint16_t pixel_color = img_ptr[src_y * fb->width + src_x];
+
+                // 4. CHUYỂN MÀU VÀ ĐÓNG GÓI
+                uint8_t r, g, b;
+                convert_rgb565_to_rgb888(pixel_color, &r, &g, &b);
+                face_112_buf[index++] = r;
+                face_112_buf[index++] = g;
+                face_112_buf[index++] = b;
+            }
+        }
+
+        // BẮN LÊN PYTHON!
+        Serial.print("CROP");                    // 4 bytes Header
+        Serial.write(face_112_buf, 37632);       // 37632 bytes Dữ liệu mặt (112*112*3)
+    }
+
+    esp_camera_fb_return(fb);
+}
