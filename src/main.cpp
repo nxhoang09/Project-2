@@ -85,25 +85,25 @@ void loop() {
     }
 
     if (current_state == STATE_OPENED) {
-        setLedSuccess();
+        showSuccess();
         vTaskDelay(pdMS_TO_TICKS(5000)); 
-        turnOffAllLeds();
+        clearDisplay();
         current_state = STATE_IDLE;
     }
     else if (current_state == STATE_STRANGER) {
-        setLedWarning();
+        showWarning();
         vTaskDelay(pdMS_TO_TICKS(3000)); 
-        turnOffAllLeds();
+        clearDisplay();
         current_state = STATE_IDLE;
     }
     else if (current_state == STATE_SPOOF) {
-        setLedSpoof();
+        showSpoof();
         current_state = STATE_IDLE;
     }
    if (Serial.available() > 0) {
         char c = Serial.read();
         if (c == 'E' || c == 'e') {
-            requestEnroll(); 
+            //requestEnroll(); 
         }
         else if (c == 'D' || c == 'd') {
             deleteAllFaces();

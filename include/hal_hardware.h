@@ -3,9 +3,10 @@
 
 void initHardware();      
 bool isButtonPressed();   
-void setLedSuccess();     
-void setLedWarning();    
-void setLedSpoof();       
-void turnOffAllLeds();  
+
+void showSuccess();     
+void showWarning();    
+void showSpoof();    
+void clearDisplay();
 
 #endif

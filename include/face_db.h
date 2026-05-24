@@ -2,12 +2,13 @@
 #include <Arduino.h>
 
 #define MAX_USERS 50
-#define MAX_EMB_PER_USER 3
+#define MAX_EMB_PER_USER 4
 #define EMBEDDING_SIZE 128
 #define FACE_THRESHOLD 0.5f
 
 struct UserFace {
-    int user_id;
+    int local_id;
+    char profile_id[37];
     int emb_count;
     float embeddings[MAX_EMB_PER_USER][EMBEDDING_SIZE];
 };
@@ -20,7 +21,8 @@ void loadFaces();
 void saveFaces();
 
 // enroll
-int createUser(float *embedding);
+int createUserWithProfileId(const char* profile_id, float *embedding);
+bool deleteFaceProfile(const char* profile_id);
 bool addEmbedding(int user_id, float *embedding);
 
 // recognize

@@ -9,12 +9,15 @@
 
 #include "face_db.h"
 #include "enroll_flow.h"
+#include "NetworkManager.h" 
 
 HumanFaceDetectMSR01 s1_detector(0.1F, 0.5F, 10, 0.2F);
 HumanFaceDetectMNP01 s2_detector(0.1F, 0.5F, 10);
 FaceRecognition112V1S8 recognizer;
 
 extern QueueHandle_t frame_queue;
+
+int failed_attempts = 0; 
 
 void initFaceAlgo() {
     Serial.println("Dang khoi tao Face System...");
@@ -25,14 +28,6 @@ void initFaceAlgo() {
     Serial.println("Face system ready!");
 }
 
-void requestEnroll() {
-    startEnroll();
-    xQueueReset(frame_queue);
-    current_state = STATE_SCANNING;
-
-    Serial.println("[BAT DAU DANG KY] Quet 4 lan khuon mat...");
-}
-
 void deleteAllFaces() {
     SPIFFS.remove("/faces.bin");
     total_users = 0;
@@ -40,6 +35,7 @@ void deleteAllFaces() {
 }
 
 bool detectFace(camera_fb_t *fb) {
+
     if (!fb) return false;
 
     std::list<dl::detect::result_t> &candidates =
@@ -86,8 +82,13 @@ bool detectFace(camera_fb_t *fb) {
     Serial.printf("| Liveness time: %d ms\n", millis() - live_start);
 
     if (!is_real) {
-        current_state = STATE_SPOOF;
+       current_state = STATE_SPOOF;
         Serial.println("[CANH BAO] GIA MAO!");
+        failed_attempts++;
+        if (failed_attempts >= 2) {
+            sendAlert("INTRUDER_ALARM", nullptr);
+            failed_attempts = 0;
+        }
         return false;
     }
 
@@ -135,10 +136,19 @@ bool detectFace(camera_fb_t *fb) {
 
     if (id >= 0) {
         current_state = STATE_OPENED;
+        failed_attempts = 0;
         Serial.printf("[MO CUA] USER %d | %d ms\n", id, infer_time);
+        sendAlert("UNLOCK_SUCCESS", users[id].profile_id);
     } else {
-        current_state = STATE_STRANGER;
-        Serial.printf("[NGUOI LA] | %d ms\n", infer_time);
+      current_state = STATE_STRANGER;
+        failed_attempts++;
+        Serial.printf("[NGUOI LA] Sai lần %d | %d ms\n", failed_attempts, infer_time);
+
+        if (failed_attempts >= 2) {
+            Serial.println("🚨 PHÁT HIỆN ĐỘT NHẬP (NGƯỜI LẠ)! Khóa hệ thống!");
+            sendAlert("INTRUDER_ALARM", nullptr);
+            failed_attempts = 0;
+        }
     }
 
     return true;

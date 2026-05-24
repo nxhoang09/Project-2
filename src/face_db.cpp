@@ -39,19 +39,48 @@ void saveFaces() {
     Serial.printf("Saved %d users\n", total_users);
 }
 
-int createUser(float *embedding) {
-    if (total_users >= MAX_USERS) return -1;
+int createUserWithProfileId(const char* profile_id, float *embedding) {
+    int target_idx = -1;
 
-    users[total_users].user_id = total_users;
-    users[total_users].emb_count = 1;
-
-    memcpy(users[total_users].embeddings[0], embedding,
-           sizeof(float) * EMBEDDING_SIZE);
-
-    total_users++;
+    for(int i = 0; i < total_users; i++){
+        if(users[i].emb_count == 0 || strlen(users[i].profile_id) == 0){
+            target_idx = i;
+            break;
+        }
+    }
+    if (target_idx == -1){
+        if(total_users >= MAX_USERS) return -1;
+        target_idx = total_users;
+        users[target_idx].local_id = target_idx;
+        total_users++;
+    }
+    users[target_idx].emb_count = 1;
+    strncpy(users[target_idx].profile_id, profile_id, sizeof(users[target_idx].profile_id) - 1);
+    users[target_idx].profile_id[36] = '\0'; 
+    memcpy(users[target_idx].embeddings[0], embedding, sizeof(float) * EMBEDDING_SIZE);
     saveFaces();
+    return target_idx;
+}
 
-    return total_users - 1;
+bool deleteFaceProfile(const char* profile_id) {
+    bool found = false;
+    for (int i = 0; i < total_users; i++) {
+        if (strcmp(users[i].profile_id, profile_id) == 0) {
+            users[i].emb_count = 0; 
+            memset(users[i].profile_id, 0, sizeof(users[i].profile_id));
+            memset(users[i].embeddings, 0, sizeof(users[i].embeddings)); 
+            
+            found = true;
+            Serial.printf("Đã xóa vĩnh viễn khuôn mặt ở ô nhớ: %d\n", users[i].local_id);
+        }
+    }
+    
+    if (found) {
+        saveFaces(); 
+    } else {
+        Serial.println("Lệnh xóa: Không tìm thấy Profile ID này trên ESP32!");
+    }
+    return found;
 }
 
 bool addEmbedding(int user_id, float *embedding) {
@@ -100,7 +129,7 @@ int recognizeFace(float *embedding) {
 
             if (score > best) {
                 best = score;
-                best_id = users[i].user_id;
+                best_id = users[i].local_id;
             }
         }
     }

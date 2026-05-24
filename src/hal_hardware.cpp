@@ -2,12 +2,21 @@
 #include "globals.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void initHardware(){
     pinMode(BUTTON_PIN, INPUT);
-    pinMode(LED_GREEN_PIN, OUTPUT);
-    pinMode(LED_RED_PIN, OUTPUT);
-    turnOffAllLeds();
+    Wire.begin(SDA_PIN, SCL_PIN);
+
+    lcd.init();
+    lcd.backlight();
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("System Ready");
 }
 
 bool isButtonPressed() {
@@ -17,32 +26,38 @@ bool isButtonPressed() {
     }
     return false;
 }
-void turnOffAllLeds() {
-    digitalWrite(LED_GREEN_PIN, LOW);
-    digitalWrite(LED_RED_PIN, LOW);
+
+void clearDisplay() {
+    lcd.clear();
 }
 
-void setLedSuccess() {
-    digitalWrite(LED_GREEN_PIN, HIGH);
-    digitalWrite(LED_RED_PIN, LOW);
+void showSuccess() {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("ACCESS GRANTED");
+    lcd.setCursor(0, 1);
+    lcd.print("Welcome!");
 }
 
-void setLedWarning() {
-    digitalWrite(LED_GREEN_PIN, LOW);
-    digitalWrite(LED_RED_PIN, HIGH);
+void showWarning() {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("ACCESS DENIED");
+    lcd.setCursor(0, 1);
+    lcd.print("Try again");
 }
 
-void setLedSpoof() {
-    digitalWrite(LED_GREEN_PIN, LOW);
-    bool led_toggle = false;
-    for (int i = 0; i < 20; i++) {
-        led_toggle = !led_toggle;
-        if(led_toggle){
-            digitalWrite(LED_RED_PIN, HIGH);
-        } else {
-            digitalWrite(LED_RED_PIN, LOW);
-        }
-        vTaskDelay(pdMS_TO_TICKS(200));
+void showSpoof() {
+    for (int i = 0; i < 10; i++) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("!!! SPOOF !!!");
+
+        vTaskDelay(pdMS_TO_TICKS(300));
+
+        lcd.clear();
+        vTaskDelay(pdMS_TO_TICKS(300));
     }
-    digitalWrite(LED_RED_PIN, LOW);
+
+    lcd.clear();
 }

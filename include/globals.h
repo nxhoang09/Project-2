@@ -3,8 +3,8 @@
 #include<Arduino.h>
 
 #define BUTTON_PIN 1
-#define LED_GREEN_PIN 2
-#define LED_RED_PIN 42
+#define SDA_PIN 42
+#define SCL_PIN 41
 
 #define WIFI_SSID "Phong 301"
 #define WIFI_PASS "1234567890"

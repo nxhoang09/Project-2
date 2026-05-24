@@ -8,6 +8,10 @@
 void initNetwork();
 void handleNetworkLoop();
 void sendReport(const char* event);
-void sendEnrollResult(const char* profile_id, const char* status, int* esp_ids, int id_count);
-
+void sendEnrollResult(const char* profile_id, const char* status, int* esp_ids, int id_count, float* face_vectors, int sample_count);
+void savePendingReport(String topic, String payload);
+void sendDeleteResult(const char* profile_id, const char* status);
+void processPendingReport();
+void sendAlert(String eventType, const char* profile_id);
+void sendUnlockResult(const char* status, const char* reason = nullptr);
 #endif
