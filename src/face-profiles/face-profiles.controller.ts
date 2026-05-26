@@ -51,6 +51,7 @@ export class FaceProfilesController {
     await this.faceProfilesService.handleSyncResult(macAddress, data);
   }
   @UseGuards(JwtAuthGuard)
+  @RequireDeviceRole(ShareRole.ADMIN)
   @Delete(':id')
   async deleteFace(
     @Param('id') profileId: string,

@@ -32,18 +32,17 @@ export class DevicesService {
       device = this.deviceRepo.create({
         mac_address: macAddress,
         name: 'Khóa Thông Minh Mới',
+        owner: { id: userId } as any, // Gán ID chủ sở hữu
       });
-      device['owner_id'] = userId; 
       await this.deviceRepo.save(device);
-      
-      return { message: 'Đã thêm thiết bị và trở thành Chủ sở hữu (Super Admin)!' };
+      return { message: 'Đã thêm thiết bị và trở thành Chủ sở hữu!' };
     }
 
-    if (device.owner) {
-      throw new BadRequestException('Khóa này đã có chủ sở hữu! Vui lòng bảo chủ nhà gửi lời mời chia sẻ vào Email của bạn.');
+    if (device.owner && device.owner.id !== userId) {
+      throw new BadRequestException('Khóa này đã có chủ! Vui lòng yêu cầu chủ cũ xóa khóa khỏi ứng dụng.');
     }
 
-    device['owner_id'] = userId;
+    device.owner = { id: userId } as any; 
     await this.deviceRepo.save(device);
     return { message: 'Đã nhận quyền Chủ sở hữu khóa thành công!' };
   }
