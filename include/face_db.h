@@ -24,6 +24,7 @@ void saveFaces();
 int createUserWithProfileId(const char* profile_id, float *embedding);
 bool deleteFaceProfile(const char* profile_id);
 bool addEmbedding(int user_id, float *embedding);
+void deleteAllFaces();
 
 // recognize
 int recognizeFace(float *embedding);

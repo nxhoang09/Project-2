@@ -8,7 +8,4 @@ bool detectFace(camera_fb_t *fb);
 
 void requestEnroll();
 
-void deleteAllFaces();
-
-
 #endif

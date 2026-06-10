@@ -142,3 +142,8 @@ int recognizeFace(float *embedding) {
     Serial.printf("Unknown (%.3f)\n", best);
     return -1;
 }
+void deleteAllFaces() {
+    SPIFFS.remove("/faces.bin");
+    total_users = 0;
+    Serial.println("Da xoa toan bo du lieu khuon mat!");
+}

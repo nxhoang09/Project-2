@@ -28,12 +28,6 @@ void initFaceAlgo() {
     Serial.println("Face system ready!");
 }
 
-void deleteAllFaces() {
-    SPIFFS.remove("/faces.bin");
-    total_users = 0;
-    Serial.println("Da xoa toan bo du lieu khuon mat!");
-}
-
 bool detectFace(camera_fb_t *fb) {
 
     if (!fb) return false;
@@ -82,7 +76,7 @@ bool detectFace(camera_fb_t *fb) {
     Serial.printf("| Liveness time: %d ms\n", millis() - live_start);
 
     if (!is_real) {
-       current_state = STATE_SPOOF;
+        setLockState(STATE_SPOOF);
         Serial.println("[CANH BAO] GIA MAO!");
         failed_attempts++;
         if (failed_attempts >= 2) {
@@ -121,7 +115,6 @@ bool detectFace(camera_fb_t *fb) {
         processEnroll(embedding);
 
         Serial.println("Doi frame tiep theo...");
-        vTaskDelay(pdMS_TO_TICKS(1000));
 
         xQueueReset(frame_queue);
 
@@ -135,12 +128,12 @@ bool detectFace(camera_fb_t *fb) {
     uint32_t infer_time = millis() - start_time;
 
     if (id >= 0) {
-        current_state = STATE_OPENED;
+        setLockState(STATE_OPENED);
         failed_attempts = 0;
         Serial.printf("[MO CUA] USER %d | %d ms\n", id, infer_time);
         sendAlert("UNLOCK_SUCCESS", users[id].profile_id);
     } else {
-      current_state = STATE_STRANGER;
+        setLockState(STATE_STRANGER);
         failed_attempts++;
         Serial.printf("[NGUOI LA] Sai lần %d | %d ms\n", failed_attempts, infer_time);
 

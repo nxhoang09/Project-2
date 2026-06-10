@@ -20,6 +20,7 @@ enum LockState{
     STATE_SPOOF
 };
 
-extern volatile LockState current_state;
+LockState getLockState();
+void setLockState(LockState s);
 
 #endif

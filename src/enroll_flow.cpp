@@ -41,8 +41,7 @@ void processEnroll(float *embedding) {
     if (sample_count >= REQUIRED_SAMPLES) {
         enrolling = false;
         int local_ids[1] = { current_local_id };
-        float* vectors = (float*)users[current_local_id].embeddings;
-        sendEnrollResult(current_profile_id, "success", local_ids, 1, vectors, REQUIRED_SAMPLES);
+        sendEnrollResult(current_profile_id, "success", local_ids, 1); // Bỏ vectors
         Serial.println("=== ENROLL DONE ===");
     }
 }
