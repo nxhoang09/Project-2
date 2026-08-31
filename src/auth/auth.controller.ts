@@ -1,6 +1,7 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, BadRequestException, Request, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -32,5 +33,37 @@ export class AuthController {
   async logout(@Body() body: any) {
     await this.authService.logout(body.userId);
     return { message: 'Đã đăng xuất' };
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body('email') email: string) {
+    if (!email) {
+      throw new BadRequestException('Vui lòng cung cấp email!');
+    }
+    
+    return this.authService.forgotPassword(email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(
+    @Body('email') email: string,
+    @Body('otp') otp: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    if (!email || !otp || !newPassword) {
+      throw new BadRequestException('Vui lòng điền đầy đủ thông tin!');
+    }
+
+    if (newPassword.length < 6) {
+      throw new BadRequestException('Mật khẩu mới phải có ít nhất 6 ký tự!');
+    }
+    return this.authService.resetPassword(email, otp, newPassword);
+  }
+
+  @UseGuards(JwtAuthGuard) 
+  @Post('change-password')
+  async changePassword(@Body() body: any, @Request() req: any) {
+    const { oldPassword, newPassword } = body;
+    return this.authService.changePassword(req.user.userId, oldPassword, newPassword);
   }
 }

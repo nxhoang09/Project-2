@@ -13,6 +13,7 @@ import { DevicesModule } from './devices/devices.module';
 import { AccessLogsModule } from './access-logs/access-logs.module';
 import { FaceProfilesModule } from './face-profiles/face-profiles.module';
 import { EventsModule } from './events/events.module';
+import { MailerModule } from '@nestjs-modules/mailer';
 
 @Module({
   imports: [
@@ -30,6 +31,24 @@ import { EventsModule } from './events/events.module';
         ssl: { rejectUnauthorized: false }, 
         synchronize: true, 
         entities: [User, Device, DeviceShare, FaceProfile, DeviceProfileAccess, AccessLog],
+      }),
+    }),
+    MailerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        transport: {
+          host: configService.get<string>('MAIL_HOST'),
+          port: 465,
+          secure: true, 
+          auth: {
+            user: configService.get<string>('MAIL_USER'),
+            pass: configService.get<string>('MAIL_PASS'),
+          },
+        },
+        defaults: {
+          from: configService.get<string>('MAIL_FROM'),
+        },
       }),
     }),
     UsersModule,

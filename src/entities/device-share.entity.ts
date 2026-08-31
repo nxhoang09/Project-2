@@ -18,7 +18,7 @@ export class DeviceShare {
   @CreateDateColumn()
   created_at: Date;
 
-  @ManyToOne(() => Device)
+  @ManyToOne(() => Device, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'device_id' })
   device: Device;
 

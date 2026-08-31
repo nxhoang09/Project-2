@@ -9,9 +9,6 @@ export class FaceProfile {
   @Column()
   name: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  face_vectors!: number[][];
-
   @CreateDateColumn()
   created_at: Date;
 

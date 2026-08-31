@@ -24,17 +24,6 @@ export class FaceProfilesController {
     return this.faceProfilesService.startEnrollment(userId, body.deviceId, body.name);
   }
 
-  @UseGuards(JwtAuthGuard, DeviceRoleGuard)
-  @RequireDeviceRole(ShareRole.ADMIN)
-  @Post(':profileId/assign')
-  async assignToDevice(
-    @Param('profileId') profileId: string, 
-    @Body('deviceId') targetDeviceId: string, 
-    @Request() req: any
-  ) {
-    const userId = req.user.userId;
-    return this.faceProfilesService.assignFaceToDevice(userId, profileId, targetDeviceId);
-  }
    
   @MessagePattern('smartlock/devices/+/enroll_result')
   async handleMqttResult(@Payload() data: any, @Ctx() context: MqttContext) {
@@ -42,13 +31,6 @@ export class FaceProfilesController {
     const macAddress = topic.split('/')[2];
     
     await this.faceProfilesService.handleEnrollResult(macAddress, data);
-  }
-  @MessagePattern('smartlock/devices/+/sync_result')
-  async handleMqttSyncResult(@Payload() data: any, @Ctx() context: MqttContext) {
-    const topic = context.getTopic();
-    const macAddress = topic.split('/')[2];
-    
-    await this.faceProfilesService.handleSyncResult(macAddress, data);
   }
   @UseGuards(JwtAuthGuard)
   @RequireDeviceRole(ShareRole.ADMIN)

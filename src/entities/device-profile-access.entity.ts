@@ -23,7 +23,7 @@ export class DeviceProfileAccess {
   @JoinColumn({ name: 'profile_id' })
   profile: FaceProfile;
 
-  @ManyToOne(() => Device)
+  @ManyToOne(() => Device, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'device_id' })
   device: Device;
 }

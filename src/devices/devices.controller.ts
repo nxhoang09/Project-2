@@ -10,8 +10,12 @@ export class DevicesController {
 
   @UseGuards(JwtAuthGuard)
   @Post('claim')
-  async claimDevice(@Body('mac_address') macAddress: string, @Request() req: any) {
-    return this.devicesService.claimOwnership(req.user.userId, macAddress);
+  async claimDevice(
+    @Body('mac_address') macAddress: string,
+    @Body('name') name: string | undefined,
+    @Request() req: any,
+  ) {
+    return this.devicesService.claimOwnership(req.user.userId, macAddress, name);
   }
 
   @UseGuards(JwtAuthGuard, DeviceRoleGuard)
@@ -44,10 +48,23 @@ export class DevicesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get(':id/shares')
+  async getDeviceShares(@Param('id') deviceId: string, @Request() req: any) {
+    return this.devicesService.getDeviceShares(req.user.userId, deviceId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('my-devices')
   async getMyDevices(@Request() req: any) {
     const userId = req.user.sub || req.user.userId; 
     return this.devicesService.getMyDevices(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  async deleteDevice(@Param('id') deviceId: string, @Request() req: any) {
+    const userId = req.user.sub || req.user.userId;
+    return this.devicesService.deleteDevice(userId, deviceId);
   }
 
   @MessagePattern('smartlock/devices/+/status')

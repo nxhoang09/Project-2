@@ -14,9 +14,12 @@ export class AccessLog {
   @CreateDateColumn({ type: 'timestamptz' })
   timestamp: Date;
 
-  @ManyToOne(() => Device)
+  @Column({ type: 'text', nullable: true })
+  device_name_snapshot: string | null;
+
+  @ManyToOne(() => Device, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'device_id' })
-  device: Device;
+  device: Device | null;
 
   @ManyToOne(() => FaceProfile, { nullable: true })
   @JoinColumn({ name: 'profile_id' })

@@ -6,6 +6,7 @@ import { FaceProfile } from 'src/entities/face-profile.entity';
 import { User } from 'src/entities/user.entity';
 import { EventsGateway } from 'src/events/events.gateway';
 import { Repository } from 'typeorm';
+import * as admin from 'firebase-admin';
 
 @Injectable()
 export class AccessLogsService {
@@ -72,8 +73,12 @@ export class AccessLogsService {
     return { success, reason };
   }
 
-  async saveLog(macAddress: string, data: any){
-    const device = await this.deviceRepo.findOne({ where: { mac_address: macAddress } });
+  async saveLog(macAddress: string, data: any) {
+    const device = await this.deviceRepo.findOne({ 
+      where: { mac_address: macAddress },
+      relations: ['owner']
+    });
+    
     if (!device) return;
 
     let eventType = typeof data?.event === 'string' ? data.event : undefined;
@@ -88,8 +93,10 @@ export class AccessLogsService {
 
     const newLog = this.accessLogRepo.create({
       device: device,
+      device_name_snapshot: device.name,
       event_type: eventType,
     });
+    
     let actorName = 'Không xác định';
 
     if (data.profile_id) {
@@ -99,14 +106,38 @@ export class AccessLogsService {
         actorName = profile.name;
       }
     }
+
     if (data.event === 'INTRUDER_ALARM') {
       actorName = 'Kẻ lạ mặt';
+
+      if (device.owner && device.owner.fcm_token) {
+        try {
+          await admin.messaging().send({
+            token: device.owner.fcm_token,
+            notification: {
+              title: '🚨 BÁO ĐỘNG ĐỘT NHẬP',
+              body: `Hệ thống phát hiện khuôn mặt người lạ đang cố mở khóa [${device.name}]!`,
+            },
+            android: {
+              priority: 'high', // Bắt buộc để đánh thức điện thoại đang tắt màn hình
+            },
+            apns: {
+              payload: { aps: { sound: 'default' } }
+            }
+          });
+          console.log(`[Firebase] Đã bắn thông báo bảo mật đến điện thoại của user: ${device.owner.id}`);
+        } catch (error) {
+          console.error('[Firebase] Lỗi khi bắn Push Notification:', error);
+        }
+      }
     }
+
     const savedLog = await this.accessLogRepo.save(newLog);
 
     const socketPayload = {
       id: savedLog.id,
       device_id: device.id,
+      device_name_snapshot: savedLog.device_name_snapshot,
       event_type: savedLog.event_type,
       actor_name: actorName,
       timestamp: savedLog.timestamp || new Date(), 
@@ -133,6 +164,7 @@ export class AccessLogsService {
     const eventType = normalized.success ? 'APP_UNLOCK_SUCCESS' : 'UNLOCK_FAILED';
     const newLog = this.accessLogRepo.create({
       device: device,
+      device_name_snapshot: device.name,
       event_type: eventType,
     });
 
@@ -152,6 +184,7 @@ export class AccessLogsService {
     this.eventsGateway.notifyNewAccessLog(device.id, {
       id: savedLog.id,
       device_id: device.id,
+      device_name_snapshot: savedLog.device_name_snapshot,
       event_type: savedLog.event_type,
       actor_name: actorName,
       timestamp: timestamp,
@@ -187,6 +220,7 @@ export class AccessLogsService {
         event_type: log.event_type,
         actor_name: actorName,
         timestamp: log.timestamp,
+        device_name_snapshot: log.device_name_snapshot,
       };
     });
   }

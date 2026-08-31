@@ -22,11 +22,38 @@ export class FaceProfilesService {
       select: ['id', 'name', 'status', 'mac_address'],
     });
 
-    if (ownedDevices.length === 0) {
+    const sharedAdmin = await this.shareRepo.find({
+      where: { user: { id: userId }, role: ShareRole.ADMIN },
+      relations: ['device'],
+    });
+
+    const deviceMap = new Map<string, { id: string; name: string; status: string; mac_address: string }>();
+    for (const device of ownedDevices) {
+      deviceMap.set(device.id, {
+        id: device.id,
+        name: device.name,
+        status: device.status,
+        mac_address: device.mac_address,
+      });
+    }
+
+    for (const share of sharedAdmin) {
+      const device = share.device;
+      if (!device || deviceMap.has(device.id)) continue;
+      deviceMap.set(device.id, {
+        id: device.id,
+        name: device.name,
+        status: device.status,
+        mac_address: device.mac_address,
+      });
+    }
+
+    const devices = Array.from(deviceMap.values());
+    if (devices.length === 0) {
       return { devices: [], profiles: [] };
     }
 
-    const deviceIds = ownedDevices.map((device) => device.id);
+    const deviceIds = devices.map((device) => device.id);
     const accessRecords = await this.accessRepo.find({
       where: { device: { id: In(deviceIds) } },
       relations: ['profile', 'device'],
@@ -57,12 +84,7 @@ export class FaceProfilesService {
     });
 
     return {
-      devices: ownedDevices.map((device) => ({
-        id: device.id,
-        name: device.name,
-        status: device.status,
-        mac_address: device.mac_address,
-      })),
+      devices,
       profiles,
     };
   }
@@ -74,7 +96,16 @@ export class FaceProfilesService {
 
     const device = await this.deviceRepo.findOne({ where: {id: deviceId}, relations: ['owner']});
     if(!device) throw new NotFoundException('Device not found');
-    if(device.owner.id !== userId) throw new ForbiddenException('Only owner can add face');
+    const isOwner = device.owner?.id === userId;
+    if (!isOwner) {
+      const share = await this.shareRepo.findOne({
+        where: { device: { id: deviceId }, user: { id: userId } },
+      });
+
+      if (!share || share.role !== ShareRole.ADMIN) {
+        throw new ForbiddenException('Chỉ Chủ nhà hoặc Quản trị viên (Admin) mới được phép thêm khuôn mặt!');
+      }
+    }
     if (device.status !== 'ONLINE') {
       throw new BadRequestException('Thiết bị đang Offline. Vui lòng thử lại khi thiết bị Online!');
     }
@@ -120,103 +151,17 @@ export class FaceProfilesService {
       return;
     }
 
+
     if (data.status !== 'success') {
       accessRecord.sync_status = 'FAILED';
       await this.accessRepo.save(accessRecord);
       console.log(`Khóa [${macAddress}] báo lỗi khi đăng ký khuôn mặt!`);
       return;
     }
-
-    if (!data.face_vectors || data.face_vectors.length === 0) {
-      accessRecord.sync_status = 'FAILED';
-      await this.accessRepo.save(accessRecord);
-      console.log(`Không nhận được vector khuôn mặt từ Khóa [${macAddress}]`);
-      return;
-    }
-
-    await this.faceProfileRepo.update(data.profile_id, {
-      face_vectors: data.face_vectors 
-    });
-
     accessRecord.local_esp_ids = data.local_esp_ids ?? [];
     accessRecord.sync_status = 'SYNCED';
     await this.accessRepo.save(accessRecord);
     console.log(`Đã lưu Vector Gốc và cấp quyền cho Khóa [${macAddress}]!`);
-  }
-
-  async assignFaceToDevice(userId: string, profileId: string, targetDeviceId: string) {
-    const targetDevice = await this.deviceRepo.findOne({ where: { id: targetDeviceId }, relations: ['owner'] });
-    if (!targetDevice || targetDevice.owner.id !== userId) {
-      throw new ForbiddenException('Bạn không có quyền trên thiết bị này!');
-    }
-
-    const profile = await this.faceProfileRepo.findOne({ where: { id: profileId } });
-    if (!profile || !profile.face_vectors || profile.face_vectors.length === 0) {
-      throw new NotFoundException('Hồ sơ này chưa có Dữ liệu khuôn mặt gốc!');
-    }
-
-    let accessRecord = await this.accessRepo.findOne({
-      where: { 
-        profile: { id: profileId },       
-        device: { id: targetDeviceId }
-       }
-    });
-
-    if (!accessRecord) {
-     accessRecord = this.accessRepo.create({
-        profile: profile,
-        device: targetDevice,
-        local_esp_ids: [],
-        sync_status: 'PENDING',
-      });
-      accessRecord['profile_id'] = profile.id;
-      accessRecord['device_id'] = targetDevice.id;
-
-      await this.accessRepo.save(accessRecord);
-    }
-
-    const topic = `smartlock/devices/${targetDevice.mac_address}/command`;
-    const payload = {
-      cmd: 'sync_face',
-      profile_id: profile.id,
-      face_vectors: profile.face_vectors 
-    };
-    
-    this.mqttClient.emit(topic, payload);
-
-    return { message: 'Đã bắn dữ liệu khuôn mặt xuống Khóa mới. Đang chờ đồng bộ...' };
-  }
-
-  async handleSyncResult(macAddress: string, data: any) {
-    if (data.status === 'success') {
-      const accessRecord = await this.accessRepo.findOne({
-        where: { 
-          profile: { id: data.profile_id }, 
-          device: { mac_address: macAddress } 
-        },
-        relations: ['device']
-      });
-
-      if (accessRecord) {
-        accessRecord.local_esp_ids = data.local_esp_ids; 
-        accessRecord.sync_status = 'SYNCED';
-        await this.accessRepo.save(accessRecord);
-        console.log(`Đã đồng bộ khuôn mặt sang Khóa [${macAddress}] thành công!`);
-      }
-    } else {
-      const accessRecord = await this.accessRepo.findOne({
-        where: { 
-          profile: { id: data.profile_id }, 
-          device: { mac_address: macAddress } 
-        }
-      });
-
-      if (accessRecord) {
-        accessRecord.sync_status = 'FAILED';
-        await this.accessRepo.save(accessRecord);
-      }
-      console.log(`Khóa [${macAddress}] báo lỗi không thể đồng bộ khuôn mặt!`);
-    }
   }
 
   private pickOverallStatus(statuses: string[]) {

@@ -22,7 +22,11 @@ export class DevicesService {
     private eventsGateway: EventsGateway,
   ) {}
 
-  async claimOwnership(userId: string, macAddress: string) {
+  async claimOwnership(userId: string, macAddress: string, name?: string) {
+    const normalizedName = name?.trim();
+    const deviceName = normalizedName && normalizedName.length > 0
+      ? normalizedName
+      : 'Khóa Thông Minh Mới';
     let device = await this.deviceRepo.findOne({
       where: { mac_address: macAddress },
       relations: ['owner']
@@ -31,7 +35,7 @@ export class DevicesService {
     if (!device) {
       device = this.deviceRepo.create({
         mac_address: macAddress,
-        name: 'Khóa Thông Minh Mới',
+        name: deviceName,
         owner: { id: userId } as any, // Gán ID chủ sở hữu
       });
       await this.deviceRepo.save(device);
@@ -42,7 +46,10 @@ export class DevicesService {
       throw new BadRequestException('Khóa này đã có chủ! Vui lòng yêu cầu chủ cũ xóa khóa khỏi ứng dụng.');
     }
 
-    device.owner = { id: userId } as any; 
+    device.owner = { id: userId } as any;
+    if (normalizedName && normalizedName.length > 0) {
+      device.name = deviceName;
+    }
     await this.deviceRepo.save(device);
     return { message: 'Đã nhận quyền Chủ sở hữu khóa thành công!' };
   }
@@ -138,6 +145,29 @@ export class DevicesService {
 
     return { message: `Đã thu hồi toàn bộ quyền truy cập của [${targetEmail}]!` };
   }
+  async getDeviceShares(ownerId: string, deviceId: string) {
+    const device = await this.deviceRepo.findOne({
+      where: { id: deviceId },
+      relations: ['owner'],
+    });
+
+    if (!device || !device.owner || device.owner.id !== ownerId) {
+      throw new ForbiddenException('Chỉ Chủ sở hữu mới có quyền xem danh sách chia sẻ!');
+    }
+
+    const shares = await this.shareRepo.find({
+      where: { device: { id: deviceId } },
+      relations: ['user'],
+      order: { created_at: 'ASC' },
+    });
+
+    return shares.map((share) => ({
+      email: share.user?.email,
+      role: share.role,
+      created_at: share.created_at,
+      user_id: share.user?.id,
+    }));
+  }
   async getMyDevices(userId: string){
     const ownedDevices = await this.deviceRepo.find({
       where: {owner: {id: userId}},
@@ -147,16 +177,29 @@ export class DevicesService {
       where: { user: { id: userId } },
       relations: ['device'],
     });
-    const sharedDevices = sharedAccesses.map(share => share.device);
-    const allDevices = [...ownedDevices, ...sharedDevices];
-
-    return allDevices.map(device => ({
+    const ownedMapped = ownedDevices.map(device => ({
       id: device.id,
       name: device.name,
       mac_address: device.mac_address,
       status: device.status,
       is_online: device.status === 'ONLINE',
+      is_owner: true,
+      share_role: ShareRole.ADMIN,
     }));
+
+    const sharedDevices = sharedAccesses
+      .filter(share => share.device)
+      .map(share => ({
+        id: share.device.id,
+        name: share.device.name,
+        mac_address: share.device.mac_address,
+        status: share.device.status,
+        is_online: share.device.status === 'ONLINE',
+        is_owner: false,
+        share_role: share.role,
+      }));
+
+    return [...ownedMapped, ...sharedDevices];
   }
   async updateDeviceStatus(macAddress: string, newStatus: string){
     const device = await this.deviceRepo.findOne({
@@ -170,5 +213,33 @@ export class DevicesService {
 
       this.eventsGateway.notifyDeviceStatus(device.id, newStatus);
     }
+  }
+
+  async deleteDevice(ownerId: string, deviceId: string) {
+    const device = await this.deviceRepo.findOne({
+      where: { id: deviceId },
+      relations: ['owner'],
+    });
+
+    if (!device) {
+      throw new NotFoundException('Không tìm thấy thiết bị này!');
+    }
+
+    if (!device.owner || device.owner.id !== ownerId) {
+      throw new ForbiddenException('Chỉ Chủ sở hữu mới có quyền xóa khóa này!');
+    }
+
+    const topic = `smartlock/devices/${device.mac_address}/command`;
+    const payload = {
+      cmd: 'factory_reset',
+      source: 'app',
+      timestamp: new Date().toISOString(),
+    };
+
+    this.mqttClient.emit(topic, payload);
+    await this.deviceRepo.remove(device);
+    this.lastUnlockByDevice.delete(deviceId);
+
+    return { message: 'Đã xóa khóa thành công!' };
   }
 }
