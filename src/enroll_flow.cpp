@@ -1,6 +1,7 @@
 #include "enroll_flow.h"
 #include "face_db.h"
 #include "NetworkManager.h"
+#include "hal_hardware.h"
 
 static bool enrolling = false;
 static int current_local_id = -1;
@@ -35,11 +36,15 @@ void processEnroll(float *embedding) {
     }
 
     sample_count++;
+    showEnrollProgress(sample_count, REQUIRED_SAMPLES);
 
     Serial.printf("Sample %d/%d\n", sample_count, REQUIRED_SAMPLES);
 
     if (sample_count >= REQUIRED_SAMPLES) {
         enrolling = false;
+        showEnrollSuccess();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        clearDisplay();
         int local_ids[1] = { current_local_id };
         sendEnrollResult(current_profile_id, "success", local_ids, 1); // Bỏ vectors
         Serial.println("=== ENROLL DONE ===");

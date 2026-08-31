@@ -10,6 +10,7 @@
 #include "face_db.h"
 #include "enroll_flow.h"
 #include "NetworkManager.h" 
+#include "hal_hardware.h"
 
 HumanFaceDetectMSR01 s1_detector(0.1F, 0.5F, 10, 0.2F);
 HumanFaceDetectMNP01 s2_detector(0.1F, 0.5F, 10);
@@ -128,6 +129,7 @@ bool detectFace(camera_fb_t *fb) {
     uint32_t infer_time = millis() - start_time;
 
     if (id >= 0) {
+        setUnlockData(id);
         setLockState(STATE_OPENED);
         failed_attempts = 0;
         Serial.printf("[MO CUA] USER %d | %d ms\n", id, infer_time);
@@ -135,6 +137,7 @@ bool detectFace(camera_fb_t *fb) {
     } else {
         setLockState(STATE_STRANGER);
         failed_attempts++;
+        setFailData(failed_attempts);
         Serial.printf("[NGUOI LA] Sai lần %d | %d ms\n", failed_attempts, infer_time);
 
         if (failed_attempts >= 2) {

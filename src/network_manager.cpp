@@ -1,4 +1,5 @@
 #include "NetworkManager.h"
+#include "hal_hardware.h"
 #include "globals.h" 
 #include "face_algo.h"
 #include "face_db.h"
@@ -93,6 +94,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 };
 
 void startBLEProvisioning() {
+    showBLEProvisioning();
     String mac = WiFi.macAddress();
     String bleName = "SmartLock_" + mac.substring(12, 17);
     bleName.replace(":", "");
@@ -142,11 +144,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
     if (strcmp(cmd, "unlock") == 0) {
         Serial.println("Yêu cầu mở khóa từ Server!");
+        setUnlockData(-1);
         setLockState(STATE_OPENED);
         sendUnlockResult("success", nullptr); // Bây giờ gọi từ trong Callback đã an toàn vì nó dùng Queue
     } 
     else if (strcmp(cmd, "start_enroll") == 0) {
         Serial.println("Yêu cầu quét khuôn mặt mới!");
+        showEnrollStart();
         const char* p_id = dataObj["profile_id"];
         startEnroll(p_id); 
         setLockState(STATE_SCANNING); 
@@ -154,6 +158,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     else if(strcmp(cmd, "delete_face") == 0){
         const char *p_id = dataObj["profile_id"];
         bool isDeleted = deleteFaceProfile(p_id);
+        if (isDeleted) {
+            showDeleteSuccess();
+            vTaskDelay(pdMS_TO_TICKS(2000));
+            clearDisplay();
+        }
         sendDeleteResult(p_id, isDeleted ? "success" : "not_found");
     } 
     else if (strcmp(cmd, "factory_reset") == 0){
