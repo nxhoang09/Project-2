@@ -50,10 +50,11 @@ Hệ thống được nối theo mô hình phân tán 3 khối, thể hiện qua
 ## TÍCH HỢP HỆ THỐNG
 
 **Phần cứng:**
+![Phan cung](docs/images/phan-cung.png)
 - **ESP32-S3 (Thiết bị biên):** thu nhận hình ảnh, chạy suy luận AI cục bộ, điều khiển Relay mở khóa. Firmware phân luồng bằng FreeRTOS:
   - *Core 0 (Network Task):* duy trì kết nối WiFi và vòng lặp MQTT; dữ liệu gửi đi qua hàng đợi (Tx Queue) chống tràn bộ nhớ; nếu rớt mạng, log cảnh báo lưu tạm vào flash (SPIFFS) và đẩy bù khi có mạng trở lại.
   - *Core 1 (AI & Camera Task):* đọc frame ảnh và suy luận AI theo 3 bước Face Detection → Liveness Detection → Face Recognition.
-![Kiến trúc hệ thống](docs/images/phan-cung.png)
+
 
 **Phần mềm:**
 - **Backend (NestJS + PostgreSQL):** xử lý nghiệp vụ trung tâm, quản lý luồng thông điệp MQTT, lưu trữ thiết bị/người dùng/nhật ký truy cập. Cơ sở dữ liệu gồm các bảng chính: `users`, `devices`, `face_profiles`, `device_shares`, `device_profile_access`, `access_logs`.
